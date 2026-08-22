@@ -2672,9 +2672,25 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 (function boot(){
   let done=false;
   const start=(msg)=>{ if(done)return; done=true; goHole(1); if(msg)setTimeout(()=>toast(msg),400); };
-  // nothing saved on this device yet -> fall back to the built-in course
+  // Merge the built-in course into whatever this device has saved.
+  // A device that once opened an older build has a saved-but-empty course; without
+  // this it would keep that emptiness forever and never see the tracing.
+  const withCourse=(saved)=>{
+    let d; try{ d=JSON.parse(JSON.stringify(COURSE_DEFAULT)); }catch(e){ return saved; }
+    if(!saved||!saved.holes) return d;
+    Object.keys(d.holes).forEach(k=>{
+      const dh=d.holes[k], sh=saved.holes[k];
+      if(!sh){ saved.holes[k]=dh; return; }
+      const hasZones=sh.zones&&Object.keys(sh.zones).some(z=>(sh.zones[z]||[]).length);
+      const dHasZones=dh.zones&&Object.keys(dh.zones).some(z=>(dh.zones[z]||[]).length);
+      if(!hasZones&&dHasZones) sh.zones=dh.zones;
+      if(!sh.setup&&dh.setup) sh.setup=dh.setup;
+    });
+    if(!saved.bag||!Object.keys(saved.bag).length) saved.bag=d.bag;
+    return saved;
+  };
   const useDefault=()=>{
-    try{ applyState(JSON.parse(JSON.stringify(COURSE_DEFAULT)),
+    try{ applyState(withCourse(null),
       ()=>{queueSave();start('Course loaded \u2014 your traced holes are ready');}); }
     catch(e){ start(); }
   };
@@ -2684,7 +2700,7 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
   p.then(v=>{
     clearTimeout(guard);
     if(!v){ useDefault(); return; }
-    try{ applyState(JSON.parse(v),()=>start('Picked up where you left off')); }
+    try{ applyState(withCourse(JSON.parse(v)),()=>{queueSave();start('Picked up where you left off');}); }
     catch(e){ useDefault(); }
   }).catch(()=>{ clearTimeout(guard); useDefault(); });
 })();

@@ -1440,7 +1440,7 @@ function quickSetupPin(which){
   fw.draw();renderLog();updateReadout(null);queueSave();
   toast(TEE_NAMES[tee]+' tee \u00b7 '+which.toUpperCase()+' pin \u00b7 '+(holeYards()||'?')+'y');
 }
-let qsStage=null;
+let qsStage=null, teeChosen=false, qsShowAll=false;
 function renderQuickSetup(){
   const bar=document.getElementById('quickSetup');
   const lab=document.getElementById('qsLabel');
@@ -1449,16 +1449,32 @@ function renderQuickSetup(){
   if(!qsStage){bar.style.display='none';return;}
   bar.style.display='flex';box.innerHTML='';
   if(qsStage==='tee'){
-    lab.textContent='Which tee are you playing?';
+    // you pick your tee once a round; after that it just confirms
+    if(teeChosen&&!qsShowAll){
+      lab.textContent='Playing the '+TEE_NAMES[tee]+' tees';
+      const go=document.createElement('button');
+      go.className='pbtn';go.style.flex='0 0 auto';go.style.fontWeight='bold';
+      go.textContent=TEE_NAMES[tee]+' \u2014 set up this hole';
+      go.addEventListener('click',()=>quickSetupApply(tee));
+      box.appendChild(go);
+      const ch=document.createElement('button');
+      ch.className='pbtn';ch.style.flex='0 0 auto';ch.style.opacity='0.7';
+      ch.textContent='change tee';
+      ch.addEventListener('click',()=>{qsShowAll=true;renderQuickSetup();});
+      box.appendChild(ch);
+      return;
+    }
+    lab.textContent='Which tee are you playing? (stays set for the round)';
     TEE_ORDER.forEach(k=>{
       const has=(YDS[k]&&YDS[k].length===18);
       const b=document.createElement('button');
       b.className='pbtn';b.style.flex='0 0 auto';
       b.textContent=TEE_NAMES[k]+(has?'':' (no yardages)');
       if(!has){b.style.opacity='0.45';}
+      if(k===tee&&teeChosen)b.style.fontWeight='bold';
       b.addEventListener('click',()=>{
         if(!has){toast(TEE_NAMES[k]+' yardages are not entered yet');return;}
-        quickSetupApply(k);
+        teeChosen=true;qsShowAll=false;queueSave();quickSetupApply(k);
       });
       box.appendChild(b);
     });
@@ -2523,6 +2539,7 @@ function goHole(n){
 document.getElementById('holePrev').addEventListener('click',()=>goHole(hi-1));
 document.getElementById('holeNext').addEventListener('click',()=>goHole(hi+1));
 document.getElementById('teeSel').addEventListener('change',e=>{
+  teeChosen=true;
   tee=e.target.value;refreshHeader();
   // rescale every hole that's already been set up
   const todo=Object.values(holes).filter(h=>h.setup);
@@ -2645,10 +2662,11 @@ function snapshot(){
   Object.values(holes).forEach(h=>{out[h.n]={setup:h.setup,points:h.points,targets:h.targets,
     green:h.green,galign:h.galign,pinsInit:h.pinsInit,flag:h.flag,elev:h.elev,pen:h.pen,fir:h.fir,gir:h.gir,putts:h.putts,
     zones:h.zones};});
-  return JSON.stringify({v:8,courseVer:COURSE_VERSION,tee:tee,bag:bag,miss:missYds,bias:shortBias,wind:wind,holes:out});
+  return JSON.stringify({v:8,courseVer:COURSE_VERSION,tee:tee,teeChosen:teeChosen,bag:bag,miss:missYds,bias:shortBias,wind:wind,holes:out});
 }
 function applyState(d,cb){
   if(d.tee){tee=d.tee;document.getElementById('teeSel').value=tee;}
+  if(d.teeChosen)teeChosen=true;
   if(d.bag)bag=d.bag;
   if(d.miss>0)missYds=d.miss;
   if(d.wind)wind=d.wind;

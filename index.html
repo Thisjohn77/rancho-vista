@@ -971,6 +971,8 @@ fw.onTap=function(n){
   const h=H();
   if(peekId){peekId=null;fw.draw();return;}
   if(mode==='setup'){
+    // the button flow is running — don't let a stray tap start the old two-tap setup
+    if(qsStage){toast('Use the buttons above');return;}
     if(setupStage===0){tempSetup={tee:{nx:n.nx,ny:n.ny},green:null};setupStage=1;
       hint('STEP 2 of 2 — now tap the MIDDLE of the green.');
       // jump straight to the green so you are not hunting for it
@@ -1426,8 +1428,14 @@ function quickSetupApply(teeKey){
     h.flag={nx:0.5,ny:GRN_NY};
     ensurePins();
     qsStage='pin';renderQuickSetup();
+    hint('Now pick where the pin is \u2014 Front, Middle or Back.');
     loadHoleImage(false);
-    setTimeout(()=>{fw.draw();renderLog();updateReadout(null);},150);
+    setTimeout(()=>{
+      // frame the green so you can see exactly what you are choosing
+      const sz=zonesInSrc(H(),fw.img), gb=sz&&polyBox(sz.green);
+      if(gb)fw.zoomToBox(gb,2.2);
+      fw.draw();renderLog();updateReadout(null);
+    },260);
   },oldRef);
   return true;
 }

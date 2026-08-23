@@ -221,6 +221,11 @@
       <span id="qsLabel" style="color:var(--chalk-dim);font-size:12px;flex:1 0 100%;"></span>
       <span id="qsButtons" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
     </div>
+    <div id="refineBar" style="display:none;gap:6px;padding:8px;align-items:center;">
+      <span id="rfLabel" style="color:var(--chalk-dim);font-size:12px;flex:1 0 100%;"></span>
+      <button class="pbtn" id="btnRefineOK" style="flex:0 0 auto;font-weight:bold;">✓ Lock it in</button>
+      <button class="pbtn" id="btnRefineCancel" style="flex:0 0 auto;opacity:.75;">Cancel</button>
+    </div>
     <div id="zoneBar" style="display:none;gap:6px;padding:6px 8px;flex-wrap:wrap;align-items:center;">
       <button class="pbtn zonetype active" data-zonetype="fairway" style="flex:0 0 auto;">🟩 Fairway</button>
       <button class="pbtn zonetype" data-zonetype="green" style="flex:0 0 auto;">🟢 Green</button>
@@ -762,6 +767,36 @@ let zoneType='fairway', zonePts=[];
 let zoneEdit=false, zoneSel=null;   // zoneSel = {type, idx} of the shape being edited
 let zoneMoveMode=false, zoneMoveAll=false, zoneLastN=null;
 let dropPending=null;   // marker id waiting to be placed at your drop spot
+/* ---- zoom-in-to-refine: a fingertip covers 20+ yards on a phone, so every
+       placement is a rough tap, then a drag while zoomed, then a confirm ---- */
+let refine=null, preZoom=null;
+function zoomAroundPoint(nx,ny,yards){
+  const h=H();
+  if(!h.ypp||!fw.ready){return;}
+  const halfPx=(yards/2)/h.ypp;                      // yards -> rendered pixels
+  const rx=halfPx/(fw.img.naturalWidth||1), ry=halfPx/(fw.img.naturalHeight||1);
+  fw.zoomToBox({x1:nx-rx,y1:ny-ry,x2:nx+rx,y2:ny+ry},1.15);
+}
+function startRefine(kind,nx,ny,extra){
+  preZoom={zoom:fw.zoom,ox:fw.ox,oy:fw.oy};
+  refine=Object.assign({kind:kind,nx:nx,ny:ny},extra||{});
+  zoomAroundPoint(nx,ny,45);
+  showRefineBar(kind==='target'
+    ? 'Drag the target to the exact spot. Drag the map to move around.'
+    : 'Drag the ball to where it finished. Drag the map to move around.');
+  fw.draw();
+}
+function showRefineBar(msg){
+  const bar=document.getElementById('refineBar');
+  document.getElementById('rfLabel').textContent=msg;
+  bar.style.display='flex';
+}
+function endRefine(){
+  refine=null;
+  document.getElementById('refineBar').style.display='none';
+  if(preZoom){fw.zoom=preZoom.zoom;fw.ox=preZoom.ox;fw.oy=preZoom.oy;fw.clamp();preZoom=null;}
+  fw.draw();
+}
 function moveWholeShape(poly,dx,dy){ poly.forEach(p=>{p.nx+=dx;p.ny+=dy;}); }
 function zoneShapeAt(nx,ny){
   const h=H(); if(!h.zones)return null;
@@ -882,6 +917,11 @@ let layers={arcs:true,labels:true,all:true,targets:true};
 fw.hitTest=function(n,v){
   if(mode==='setup')return null;
   const h=H(),r=24*DPR*mk(v),t=v.toScreen(n.nx,n.ny);
+  if(refine){
+    const s=v.toScreen(refine.nx,refine.ny);
+    // only the marker itself is grabbable; dragging elsewhere pans the map
+    return (Math.hypot(s.x-t.x,s.y-t.y)<=30*DPR*mk(v)) ? 'rf' : null;
+  }
   if(mode==='zone'&&zoneEdit){
     if(zoneMoveAll)return 'zmoveall';        // drag anywhere to slide every shape together
     const poly=selectedPoly();
@@ -916,6 +956,15 @@ fw.hitTest=function(n,v){
 };
 fw.onDrag=function(id,n){
   const h=H();
+  if(id==='rf'){
+    refine.nx=n.nx;refine.ny=n.ny;
+    if(refine.kind==='target'){
+      const live=h.targets.filter(t=>!t.locked);
+      live.forEach(t=>{t.nx=n.nx;t.ny=n.ny;});
+      updateReadout(n);
+    }
+    return;
+  }
   if(id==='zmoveall'){
     if(zoneLastN){
       const dx=n.nx-zoneLastN.nx, dy=n.ny-zoneLastN.ny;
@@ -942,6 +991,10 @@ fw.onDrag=function(id,n){
   const p=h.points.find(p=>p.id===id); if(p){p.nx=n.nx;p.ny=n.ny;}
 };
 fw.onDragEnd=function(key,moved){
+  if(key==='rf'){
+    // a tap on the marker (no drag) confirms — the fast path
+    if(!moved){document.getElementById('btnRefineOK').click();return;}
+    fw.draw();if(refine&&refine.kind==='target')syncLock();return;}
   if(key==='zmove'||key==='zmoveall'){ zoneLastN=null; if(moved)queueSave(); fw.draw(); return; }
   if(key&&key.slice(0,3)==='zv:'){
     if(moved){queueSave();fw.draw();return;}
@@ -1003,11 +1056,14 @@ fw.onTap=function(n){
   }
   if(!h.render){toast('Run Setup for this hole first');return;}
   if(mode==='target'){
+    if(refine)return;                       // drag-only once you are zoomed in
     const live=h.targets.filter(t=>!t.locked);
     if(live.length){live.forEach(t=>{t.nx=n.nx;t.ny=n.ny;});}
     else h.targets.push({id:'t'+Date.now()+Math.random().toString(16).slice(2),nx:n.nx,ny:n.ny,locked:false});
     layers.targets=true;
-    fw.draw();renderLog();updateReadout(n);syncLock();return;}
+    fw.draw();renderLog();updateReadout(n);syncLock();
+    startRefine('target',n.nx,n.ny);
+    return;}
   if(mode==='pin'){
     h.flag={nx:n.nx,ny:n.ny};
     fw.draw();renderLog();updateReadout(null);
@@ -1065,10 +1121,12 @@ fw.onTap=function(n){
                              :'Tap where your ball is.');},200);
       return;
     }
+    if(refine)return;                       // drag-only once you are zoomed in
     const tg=activeTarget();
     if(askAt==='target'&&tg){
-      if(!tg.club){const tp=targetPlan(refPoint(),tg);if(tp&&tp.best)tg.club=tp.best.club;}
-      club=tg.club||null;openResult(n,tg);return;
+      // zoom in first so you can place the ball exactly; the card waits for your OK
+      startRefine('shot',n.nx,n.ny,{tgt:tg.id});
+      return;
     }
     if(askAt==='off'){
       h.points.push({id:'p'+Date.now()+Math.random().toString(16).slice(2),nx:n.nx,ny:n.ny,
@@ -1504,6 +1562,7 @@ function zoomSetupToTees(){
 }
 function setMode(m){
   const wasSetup = mode==='setup';
+  if(refine){refine=null;preZoom=null;const rb=document.getElementById('refineBar');if(rb)rb.style.display='none';}
   if(mode==='target'&&m!=='target')H().targets.forEach(t=>t.locked=true);
   mode=m;setupStage=0;
   document.querySelectorAll('.mode-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
@@ -1623,6 +1682,33 @@ document.getElementById('btnZoneFinish').addEventListener('click',()=>{
   h.zones[zoneType].push(zonePts);
   zonePts=[];fw.draw();queueSave();
   toast(zoneType.toUpperCase()+' shape saved');
+});
+document.getElementById('btnRefineOK').addEventListener('click',()=>{
+  if(!refine)return;
+  const kind=refine.kind, nx=refine.nx, ny=refine.ny, tgtId=refine.tgt;
+  endRefine();
+  const h=H();
+  if(kind==='target'){
+    const live=h.targets.filter(t=>!t.locked);
+    live.forEach(t=>{t.nx=nx;t.ny=ny;});
+    fw.draw();renderLog();updateReadout({nx:nx,ny:ny});syncLock();
+    toast('Target set \u2014 now lock it to pick a club');
+    return;
+  }
+  const tg=(h.targets||[]).find(t=>t.id===tgtId)||activeTarget();
+  if(tg){ if(!tg.club){const tp=targetPlan(refPoint(),tg);if(tp&&tp.best)tg.club=tp.best.club;}
+    club=tg.club||null; }
+  openResult({nx:nx,ny:ny},tg);
+});
+document.getElementById('btnRefineCancel').addEventListener('click',()=>{
+  if(!refine)return;
+  const h=H();
+  if(refine.kind==='target'){
+    // drop the target we just created so nothing is left behind
+    h.targets=h.targets.filter(t=>t.locked);
+  }
+  endRefine();fw.draw();renderLog();updateReadout(null);syncLock();
+  toast('Cancelled');
 });
 document.getElementById('btnZoneMoveAll').addEventListener('click',()=>{
   if(!zoneEdit){toast('Press \u270f\ufe0f Edit shapes first');return;}
@@ -2536,6 +2622,7 @@ function refreshHeader(){
 function goHole(n){
   hi=Math.max(1,Math.min(18,n));
   tempSetup=null;shownSrc=null;dropPending=null;
+  if(refine){refine=null;preZoom=null;const rb=document.getElementById('refineBar');if(rb)rb.style.display='none';}
   refreshHeader();buildThumbs();
   mode='shot';setupStage=0;
   document.querySelectorAll('.mode-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode==='shot'));

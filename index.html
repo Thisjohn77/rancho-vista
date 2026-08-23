@@ -2870,6 +2870,13 @@ function logPutt(made){
 }
 document.getElementById('btnMissed').addEventListener('click',()=>logPutt(false));
 document.getElementById('btnMade').addEventListener('click',()=>logPutt(true));
+// an aim of 172 inches means nothing; 14 ft 4 in you can actually picture
+function fmtAim(inch){
+  const r=Math.round(inch);
+  if(r<24) return r+'\u2033';
+  const f=Math.floor(r/12), i=r%12;
+  return i ? (f+"' "+i+'\u2033') : (f+"'");
+}
 // under 10 feet the inches matter — that's where you're deciding a 6-incher from a 3-footer
 function fmtDist(ft){
   if(ft<10){let w=Math.floor(ft),i=Math.round((ft-w)*12);
@@ -2893,7 +2900,7 @@ function updateResult(light){
       gn.draw();return;
     }
     const inch=breakInches(ft,auto.pct);
-    big.textContent='Aim '+inch.toFixed(1)+'\u2033 '+(auto.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
+    big.textContent='Aim '+fmtAim(inch)+' '+(auto.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
     sm.textContent=fmtDist(ft)+' \u00b7 '+udTxt+' \u00b7 breaks '+(auto.brk==='lr'?'L\u2192R':'R\u2192L')+
       ' \u00b7 '+auto.pct.toFixed(1)+'% \u00b7 read from '+auto.used+' grid points';
     gn.draw();return;
@@ -2906,7 +2913,7 @@ function updateResult(light){
   if(g.slopePct==null){big.textContent=fmtDist(ft)+' putt';
     sm.textContent='Type the printed slope number into the Slope% box';gn.draw();return;}
   const inch=breakInches(ft,g.slopePct);
-  big.textContent='Aim '+inch.toFixed(1)+'" '+(g.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
+  big.textContent='Aim '+fmtAim(inch)+' '+(g.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
   sm.textContent=fmtDist(ft)+' · '+g.slopePct+'% · breaks '+(g.brk==='lr'?'L→R':'R→L')+(ud?' · '+ud:'');
   gn.draw();
 }

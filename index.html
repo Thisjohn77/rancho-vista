@@ -308,6 +308,13 @@
       <button class="pbtn" id="btnReadPutt">⛳ Read Putt</button>
       <button class="pbtn" id="btnClearPutt">🗑️ Clear</button>
       <button class="pbtn" id="btnCalibrateGreen" style="flex:0 0 76px;font-size:10px">📏 Adjust</button>
+      <button class="pbtn" id="btnGrid" style="flex:0 0 70px;font-size:10px">⛰ Grid</button>
+    </div>
+    <div class="row hidden" id="gridRow" style="flex-wrap:wrap;gap:4px;">
+      <span class="mini" id="gridInfo" style="flex:1 0 100%;"></span>
+      <button class="pbtn" id="btnGridUndo" style="flex:0 0 auto;font-size:11px">↩️ Undo point</button>
+      <button class="pbtn" id="btnGridClear" style="flex:0 0 auto;font-size:11px">🗑️ Clear grid</button>
+      <button class="pbtn" id="btnGridDone" style="flex:0 0 auto;font-size:11px">✓ Done</button>
     </div>
     <div class="row hidden" id="snapRow" style="flex-wrap:wrap;gap:4px;">
       <label class="mini" style="flex:1 0 100%;">Snap to distance — keeps your line, sets the length</label>
@@ -324,6 +331,15 @@
       <button class="pbtn snapft" data-ft="10" style="flex:0 0 auto;font-size:11px">10ft</button>
       <button class="pbtn snapft" data-ft="15" style="flex:0 0 auto;font-size:11px">15ft</button>
       <button class="pbtn snapft" data-ft="20" style="flex:0 0 auto;font-size:11px">20ft</button>
+      <button class="pbtn snapft" data-ft="25" style="flex:0 0 auto;font-size:11px">25ft</button>
+      <button class="pbtn snapft" data-ft="30" style="flex:0 0 auto;font-size:11px">30ft</button>
+      <button class="pbtn snapft" data-ft="40" style="flex:0 0 auto;font-size:11px">40ft</button>
+      <button class="pbtn snapft" data-ft="50" style="flex:0 0 auto;font-size:11px">50ft</button>
+      <button class="pbtn snapft" data-ft="60" style="flex:0 0 auto;font-size:11px">60ft</button>
+      <button class="pbtn snapft" data-ft="70" style="flex:0 0 auto;font-size:11px">70ft</button>
+      <button class="pbtn snapft" data-ft="80" style="flex:0 0 auto;font-size:11px">80ft</button>
+      <button class="pbtn snapft" data-ft="90" style="flex:0 0 auto;font-size:11px">90ft</button>
+      <button class="pbtn snapft" data-ft="100" style="flex:0 0 auto;font-size:11px">100ft</button>
     </div>
     <div class="row hidden" id="slopeRow">
       <label class="mini">Slope%</label>
@@ -350,6 +366,32 @@
   </div>
 </div>
 
+<div class="overlay2" id="gridModal">
+  <div class="sheet">
+    <h2>Slope at this spot</h2>
+    <div class="row" style="align-items:center;gap:8px;">
+      <label class="mini">Printed number</label>
+      <input class="pctInput" id="gridPct" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 4.5" style="flex:1">
+    </div>
+    <div class="mini" style="margin:10px 0 6px;">Which way does the arrow point? (downhill)</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:230px;margin-bottom:6px;">
+      <button class="pbtn griddir" data-dir="315">↖</button>
+      <button class="pbtn griddir" data-dir="0">↑</button>
+      <button class="pbtn griddir" data-dir="45">↗</button>
+      <button class="pbtn griddir" data-dir="270">←</button>
+      <button class="pbtn" disabled style="opacity:.25">·</button>
+      <button class="pbtn griddir" data-dir="90">→</button>
+      <button class="pbtn griddir" data-dir="225">↙</button>
+      <button class="pbtn griddir" data-dir="180">↓</button>
+      <button class="pbtn griddir" data-dir="135">↘</button>
+    </div>
+    <div class="mini" id="gridDirLbl" style="margin-bottom:8px;">no direction picked</div>
+    <div class="row">
+      <button class="pbtn" id="gridCancel">Cancel</button>
+      <button class="pbtn" id="gridSave" style="font-weight:bold">Add point</button>
+    </div>
+  </div>
+</div>
 <div class="overlay2" id="shotModal">
   <div class="sheet">
     <h2 id="shotModalTitle">Shot</h2>
@@ -554,7 +596,8 @@ for(let i=1;i<=18;i++){
     ypp:null,                 // yards per rendered pixel
     points:[], targets:[], pinsInit:false, flag:null, elev:0, pen:0, fir:null, gir:null, rw:0, rh:0, putts:[],
     galign:null, zones:{fairway:[],green:[],fringe:[],bunker:[],penalty:[],tee:[],ob:[]},
-    green:{cal:1,ball:null,flag:null,brk:null,slopePct:null,updown:null}};
+    green:{cal:1,ball:null,flag:null,brk:null,slopePct:null,updown:null},
+    grid:[]};   // [{nx,ny,pct,dir}] dir = degrees the ball rolls DOWNHILL, 0 = up-panel
 }
 let bag={};          // club -> your yardage, edited by you
 let hi=1;
@@ -2453,6 +2496,15 @@ gn.onDrag=function(k,n){
 };
 gn.onDragEnd=function(){pushToFairway();updateResult();};
 gn.onTap=function(n){
+  if(gridMode){
+    gridPend={nx:n.nx,ny:n.ny};gridDir=null;
+    document.getElementById('gridPct').value='';
+    document.getElementById('gridDirLbl').textContent='no direction picked';
+    document.querySelectorAll('.griddir').forEach(x=>x.classList.remove('active'));
+    show('gridModal');
+    setTimeout(()=>{const el=document.getElementById('gridPct');if(el)el.focus();},80);
+    return;
+  }
   if(aligning){
     const h=H();
     const v=panelToFeet(n,h.green.cal);
@@ -2473,6 +2525,21 @@ gn.onTap=function(n){
 };
 gn.render=function(c,v){
   const g=H().green, K=mk(v), hh=H();
+  // the typed-in grid: a dot, the printed number, and the downhill arrow
+  (hh.grid||[]).forEach(pt=>{
+    const q=v.toScreen(pt.nx,pt.ny), r=4*DPR*K;
+    const a=(pt.dir-90)*Math.PI/180, L=13*DPR*K;
+    c.strokeStyle='#000000';c.lineWidth=3.5*DPR*K;
+    c.beginPath();c.moveTo(q.x,q.y);c.lineTo(q.x+Math.cos(a)*L,q.y+Math.sin(a)*L);c.stroke();
+    c.strokeStyle='#ffd24a';c.lineWidth=1.8*DPR*K;
+    c.beginPath();c.moveTo(q.x,q.y);c.lineTo(q.x+Math.cos(a)*L,q.y+Math.sin(a)*L);c.stroke();
+    c.beginPath();c.arc(q.x,q.y,r,0,7);c.fillStyle='#ffd24a';c.fill();
+    c.lineWidth=1.5*DPR*K;c.strokeStyle='#000000';c.stroke();
+    const t=pt.pct.toFixed(1);
+    c.font='bold '+(10*DPR*K)+'px monospace';c.textAlign='center';c.textBaseline='middle';
+    c.lineWidth=3*DPR*K;c.strokeStyle='#000000';c.strokeText(t,q.x,q.y-12*DPR*K);
+    c.fillStyle='#ffd24a';c.fillText(t,q.x,q.y-12*DPR*K);
+  });
   // putts you've already logged stay drawn
   (hh.putts||[]).forEach((p,i)=>{
     if(!p.from||!p.to)return;
@@ -2592,14 +2659,67 @@ function advance(){
 }
 /* Slide the ball along the line it is already on so it sits an exact distance
    from the hole. Feet scale linearly with the vector, so this is exact. */
+/* ---------- the printed StrackaLine grid, typed in once per green ----------
+   Each point is a spot on the panel with the printed slope % and the arrow
+   direction (the way a ball rolls downhill). Once a green has these, break and
+   uphill/downhill can be worked out from wherever the ball actually is. */
+let gridMode=false, gridPend=null, gridDir=null;
+function gridArr(){const h=H();if(!Array.isArray(h.grid))h.grid=[];return h.grid;}
+function refreshGridInfo(){
+  const el=document.getElementById('gridInfo');if(!el)return;
+  const n=gridArr().length;
+  el.textContent=n?(n+' point'+(n>1?'s':'')+' entered — tap the panel to add more')
+                  :'Tap a spot on the grid panel, then type the printed number';
+}
+document.getElementById('btnGrid').addEventListener('click',()=>{
+  gridMode=!gridMode;
+  document.getElementById('btnGrid').classList.toggle('on',gridMode);
+  document.getElementById('gridRow').classList.toggle('hidden',!gridMode);
+  refreshGridInfo();
+  toast(gridMode?'Grid entry on — tap a spot on the panel':'Grid entry off');
+  gn.draw();
+});
+document.getElementById('btnGridDone').addEventListener('click',()=>{
+  gridMode=false;
+  document.getElementById('btnGrid').classList.remove('on');
+  document.getElementById('gridRow').classList.add('hidden');
+  gn.draw();queueSave();
+});
+document.getElementById('btnGridUndo').addEventListener('click',()=>{
+  gridArr().pop();refreshGridInfo();gn.draw();queueSave();
+});
+document.getElementById('btnGridClear').addEventListener('click',()=>{
+  if(!confirm('Clear every grid point on this green?'))return;
+  H().grid=[];refreshGridInfo();gn.draw();queueSave();
+});
+document.querySelectorAll('.griddir').forEach(b=>b.addEventListener('click',()=>{
+  gridDir=parseFloat(b.dataset.dir);
+  document.querySelectorAll('.griddir').forEach(x=>x.classList.toggle('active',x===b));
+  document.getElementById('gridDirLbl').textContent='falls '+b.textContent;
+}));
+document.getElementById('gridCancel').addEventListener('click',()=>{
+  hide('gridModal');gridPend=null;gridDir=null;
+});
+document.getElementById('gridSave').addEventListener('click',()=>{
+  const pct=parseFloat(document.getElementById('gridPct').value);
+  if(!(pct>=0)){toast('Type the printed slope number');return;}
+  if(gridDir==null){toast('Pick which way the arrow points');return;}
+  gridArr().push({nx:gridPend.nx,ny:gridPend.ny,pct:pct,dir:gridDir});
+  hide('gridModal');gridPend=null;gridDir=null;
+  refreshGridInfo();gn.draw();queueSave();
+  toast('Point added \u2014 '+gridArr().length+' on this green');
+});
 function snapPuttFeet(ft){
   const g=H().green;
   if(!g.ball||!g.flag){toast('Place the ball and the flag first');return;}
   const cur=gFeet(g.ball,g.flag,g.cal);
   if(!(cur>0.01)){toast('Move the ball off the hole first, then snap');return;}
   const t=ft/cur;
-  g.ball={nx:g.flag.nx+(g.ball.nx-g.flag.nx)*t,
-          ny:g.flag.ny+(g.ball.ny-g.flag.ny)*t};
+  const nb={nx:g.flag.nx+(g.ball.nx-g.flag.nx)*t,
+            ny:g.flag.ny+(g.ball.ny-g.flag.ny)*t};
+  if(nb.nx<-0.05||nb.nx>1.05||nb.ny<-0.05||nb.ny>1.05){
+    toast(fmtDist(ft)+' is off the panel on that line \u2014 pick a shorter one');return;}
+  g.ball=nb;
   updateResult();pushToFairway();gn.draw();
   toast(fmtDist(ft)+' from the hole \u2014 same line');
 }
@@ -2842,7 +2962,7 @@ function snapshot(){
   const out={};
   Object.values(holes).forEach(h=>{out[h.n]={setup:h.setup,points:h.points,targets:h.targets,
     green:h.green,galign:h.galign,pinsInit:h.pinsInit,flag:h.flag,elev:h.elev,pen:h.pen,fir:h.fir,gir:h.gir,putts:h.putts,
-    zones:h.zones};});
+    zones:h.zones,grid:h.grid};});
   return JSON.stringify({v:8,courseVer:COURSE_VERSION,tee:tee,teeChosen:teeChosen,bag:bag,miss:missYds,bias:shortBias,wind:wind,holes:out});
 }
 function applyState(d,cb){
@@ -2858,7 +2978,7 @@ function applyState(d,cb){
       if(s.green)h.green=s.green;
       h.galign=(s.galign==null?null:s.galign);
       h.pinsInit=!!s.pinsInit;h.flag=s.flag||null;h.elev=s.elev||0;h.pen=s.pen||0;h.fir=(s.fir===undefined?null:s.fir);h.gir=(s.gir===undefined?null:s.gir);h.putts=s.putts||[];
-      h.zones=normZones(s.zones);}});
+      h.zones=normZones(s.zones);h.grid=Array.isArray(s.grid)?s.grid:[];}});
   const todo=Object.values(holes).filter(h=>h.setup);let i=0;
   (function next(){
     if(i>=todo.length){if(cb)cb();return;}

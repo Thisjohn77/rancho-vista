@@ -1021,6 +1021,8 @@ fw.onDragEnd=function(key,moved){
   peekId=null;renderLog();updateReadout(null);
 };
 fw.onTap=function(n){
+  // while zoomed in refining, any tap means "that's the spot" — drag still moves things
+  if(refine){document.getElementById('btnRefineOK').click();return;}
   const h=H();
   if(peekId){peekId=null;fw.draw();return;}
   if(mode==='setup'){
@@ -1056,7 +1058,6 @@ fw.onTap=function(n){
   }
   if(!h.render){toast('Run Setup for this hole first');return;}
   if(mode==='target'){
-    if(refine)return;                       // drag-only once you are zoomed in
     const live=h.targets.filter(t=>!t.locked);
     if(live.length){live.forEach(t=>{t.nx=n.nx;t.ny=n.ny;});}
     else h.targets.push({id:'t'+Date.now()+Math.random().toString(16).slice(2),nx:n.nx,ny:n.ny,locked:false});
@@ -1121,7 +1122,6 @@ fw.onTap=function(n){
                              :'Tap where your ball is.');},200);
       return;
     }
-    if(refine)return;                       // drag-only once you are zoomed in
     const tg=activeTarget();
     if(askAt==='target'&&tg){
       // zoom in first so you can place the ball exactly; the card waits for your OK
@@ -1306,6 +1306,21 @@ fw.render=function(c,v){
   }
   const K=mk(v);
   if(h.flag){const q=v.toScreen(h.flag.nx,h.flag.ny);drawPin(c,q.x,q.y,pinZone(h.flag),K);}
+  if(refine){
+    const q=v.toScreen(refine.nx,refine.ny);
+    if(refine.kind==='shot'){
+      c.beginPath();c.arc(q.x,q.y,13*DPR*K,0,7);
+      c.fillStyle='#41c7c7';c.fill();
+      c.lineWidth=2.5*DPR*K;c.strokeStyle='#0a1f16';c.stroke();
+    }
+    c.beginPath();c.arc(q.x,q.y,26*DPR*K,0,7);
+    c.strokeStyle='#41c7c7';c.lineWidth=2*DPR*K;c.setLineDash([4*DPR,4*DPR]);c.stroke();c.setLineDash([]);
+    c.fillStyle='#41c7c7';c.font='bold '+(9*DPR*K)+'px monospace';c.textAlign='center';
+    c.fillText('DRAG ME',q.x,q.y+42*DPR*K);
+    const rp=refPoint();
+    if(rp&&h.ypp){c.fillStyle='#eef3ea';c.font='bold '+(12*DPR*K)+'px monospace';
+      c.fillText(yd(fw.px(rp,refine))+'y',q.x,q.y-34*DPR*K);}
+  }
   placed=[];
   shots.forEach((p,i)=>{
     const q=v.toScreen(p.nx,p.ny);
@@ -1772,6 +1787,8 @@ function syncLock(){
   b.classList.toggle('on',!!t.locked);
 }
 document.getElementById('btnLock').addEventListener('click',()=>{
+  // you may still be zoomed in placing it — commit that first
+  if(refine&&refine.kind==='target'){document.getElementById('btnRefineOK').click();}
   const t=lastTarget();
   if(!t){toast('Place a target first (Target mode)');return;}
   t.locked=!t.locked;

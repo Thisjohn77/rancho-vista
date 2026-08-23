@@ -2709,6 +2709,61 @@ document.getElementById('gridSave').addEventListener('click',()=>{
   refreshGridInfo();gn.draw();queueSave();
   toast('Point added \u2014 '+gridArr().length+' on this green');
 });
+/* ---------- read the green from the typed-in grid ----------
+   Each grid point is a fall vector (which way a ball rolls, and how steeply).
+   Split each one into the part pointing ALONG your line (that's uphill/downhill)
+   and the part pointing ACROSS it (that's the break). Sample only what your ball
+   actually rolls over, and weight it toward the hole, because the ball is slowest
+   there and that is where it turns most. */
+function readGreen(){
+  const h=H(),g=h.green,pts=h.grid||[];
+  if(!g.ball||!g.flag||!pts.length)return null;
+  const k=g.cal||1;
+  const F=p=>({x:p.nx*GFX*k, y:p.ny*GFY*k});          // panel -> feet
+  const B=F(g.ball), L=F(g.flag);
+  const vx=L.x-B.x, vy=L.y-B.y, D=Math.hypot(vx,vy);
+  if(D<0.3)return null;
+  const ux=vx/D, uy=vy/D;                              // along the line, ball -> hole
+  const cx=-uy, cy=ux;                                 // across it; positive = ball's right
+  const iw=gn.img?gn.img.naturalWidth:1, ih=gn.img?gn.img.naturalHeight:1;
+  let wAlong=0,wCross=0,wSum=0,used=0;
+  pts.forEach(p=>{
+    const P=F(p);
+    const rx=P.x-B.x, ry=P.y-B.y;
+    const t=(rx*ux+ry*uy)/D;                           // 0 at the ball, 1 at the hole
+    const d=rx*cx+ry*cy;                               // feet left/right of the line
+    if(t<-0.05||t>1.05)return;
+    if(Math.abs(d)>5)return;
+    // the printed arrow points downhill; convert its screen angle into feet
+    const a=(p.dir-90)*Math.PI/180;
+    let fx=Math.cos(a)/iw*GFX, fy=Math.sin(a)/ih*GFY;
+    const fl=Math.hypot(fx,fy)||1; fx/=fl; fy/=fl;
+    const along=(fx*ux+fy*uy)*p.pct;                   // + = falls toward the hole
+    const cross=(fx*cx+fy*cy)*p.pct;                   // + = falls to the right
+    const wT=0.15+t*t;                                 // heavier near the hole
+    const wD=Math.exp(-(d*d)/(2*3*3));                 // fades either side of the line
+    const w=wT*wD;
+    wAlong+=along*w; wCross+=cross*w; wSum+=w; used++;
+  });
+  if(!wSum||used<2)return null;
+  const along=wAlong/wSum, cross=wCross/wSum;
+  return {
+    used:used,
+    along:along, cross:cross,
+    brk: cross>0.15 ? 'lr' : cross<-0.15 ? 'rl' : 'none',
+    pct: Math.abs(cross),
+    updown: along>0.3 ? 'down' : along<-0.3 ? 'up' : 'level'
+  };
+}
+function applyGreenRead(){
+  const r=readGreen(); if(!r)return null;
+  const g=H().green;
+  g.brk=r.brk; g.slopePct=Math.round(r.pct*10)/10; g.updown=r.updown;
+  document.querySelectorAll('[data-brk]').forEach(x=>x.classList.toggle('active',x.dataset.brk===g.brk));
+  document.querySelectorAll('[data-ud]').forEach(x=>x.classList.toggle('active',x.dataset.ud===g.updown));
+  const si=document.getElementById('slopeInput'); if(si)si.value=g.slopePct;
+  return r;
+}
 function snapPuttFeet(ft){
   const g=H().green;
   if(!g.ball||!g.flag){toast('Place the ball and the flag first');return;}
@@ -2796,7 +2851,22 @@ function updateResult(light){
   if(!light){queueSave();renderPuttList();}
   const g=H().green,big=document.getElementById('resultBig'),sm=document.getElementById('resultSmall');
   if(!g.ball||!g.flag){big.textContent='–';sm.textContent='Press Read Putt, then tap ball and flag';gn.draw();return;}
+  // if this green has a grid, it reads itself and follows the ball
+  const auto=applyGreenRead();
   const ft=gFeet(g.ball,g.flag,g.cal);
+  if(auto){
+    const udTxt=({up:'uphill',down:'downhill',level:'level'})[auto.updown];
+    if(auto.brk==='none'){
+      big.textContent=fmtDist(ft)+' \u00b7 no break';
+      sm.textContent=udTxt+' \u2014 aim straight at the hole \u00b7 read from '+auto.used+' grid points';
+      gn.draw();return;
+    }
+    const inch=breakInches(ft,auto.pct);
+    big.textContent='Aim '+inch.toFixed(1)+'\u2033 '+(auto.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
+    sm.textContent=fmtDist(ft)+' \u00b7 '+udTxt+' \u00b7 breaks '+(auto.brk==='lr'?'L\u2192R':'R\u2192L')+
+      ' \u00b7 '+auto.pct.toFixed(1)+'% \u00b7 read from '+auto.used+' grid points';
+    gn.draw();return;
+  }
   const ud=g.updown?({up:'uphill',down:'downhill',level:'level'})[g.updown]:'';
   if(g.brk==='none'){big.textContent=fmtDist(ft)+' · no break';
     sm.textContent=(ud?ud+' — ':'')+'aim straight at the hole';gn.draw();return;}

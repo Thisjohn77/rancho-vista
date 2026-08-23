@@ -2430,7 +2430,11 @@ document.querySelectorAll('[data-gzoom]').forEach(b=>b.addEventListener('click',
 gn.hitTest=function(n,v){const g=H().green,r=26*DPR*mk(v),t=v.toScreen(n.nx,n.ny);
   for(const k of ['ball','flag'])if(g[k]){const s=v.toScreen(g[k].nx,g[k].ny);
     if(Math.hypot(s.x-t.x,s.y-t.y)<=r)return k;}return null;};
-gn.onDrag=function(k,n){H().green[k]={nx:n.nx,ny:n.ny};};
+gn.onDrag=function(k,n){
+  H().green[k]={nx:n.nx,ny:n.ny};
+  // recompute while you drag — you can't place a putt you can't measure
+  updateResult(true);
+};
 gn.onDragEnd=function(){pushToFairway();updateResult();};
 gn.onTap=function(n){
   if(aligning){
@@ -2466,7 +2470,7 @@ gn.render=function(c,v){
     c.fillStyle=p.made?'#0a1f16':'#ffffff';c.font='bold '+(9*DPR*K)+'px monospace';
     c.textAlign='center';c.textBaseline='middle';c.fillText(String(i+1),a.x,a.y);
     c.fillStyle=p.made?'#e8c14a':'rgba(255,255,255,0.75)';c.font='bold '+(8*DPR*K)+'px monospace';
-    c.fillText(p.ft.toFixed(1)+'ft'+(p.made?' \u2713':''),a.x,a.y-14*DPR*K);
+    c.fillText(fmtDist(p.ft)+(p.made?' \u2713':''),a.x,a.y-14*DPR*K);
   });
   // ball -> flag line: black core with a white casing so it reads on every panel
   if(g.ball&&g.flag){
@@ -2477,6 +2481,18 @@ gn.render=function(c,v){
     c.strokeStyle='#000000';c.lineWidth=2.2*DPR*K;
     c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();
     c.setLineDash([]);
+    // distance sits ABOVE the flag, clear of the finger that's dragging the ball
+    const txt=fmtDist(gFeet(g.ball,g.flag,g.cal));
+    c.font='bold '+(17*DPR*K)+'px monospace';c.textAlign='center';c.textBaseline='middle';
+    const w=c.measureText(txt).width, bx=b.x, by=b.y-46*DPR*K;
+    c.fillStyle='rgba(0,0,0,0.82)';
+    c.beginPath();
+    const pad=10*DPR*K, hgt=26*DPR*K;
+    c.roundRect ? c.roundRect(bx-w/2-pad,by-hgt/2,w+pad*2,hgt,6*DPR*K)
+                : c.rect(bx-w/2-pad,by-hgt/2,w+pad*2,hgt);
+    c.fill();
+    c.strokeStyle='#ffffff';c.lineWidth=1.5*DPR*K;c.stroke();
+    c.fillStyle='#ffffff';c.fillText(txt,bx,by);
   }
   const aim=computeAim();
   if(aim&&g.flag){
@@ -2588,7 +2604,7 @@ function renderPuttList(){
   const row=document.getElementById('puttLogRow'),g=h.green;
   if(row)row.classList.toggle('hidden',!(g.ball&&g.flag));
   if(!h.putts||!h.putts.length){el.innerHTML='No putts logged on this green yet.';return;}
-  el.innerHTML=h.putts.map((p,i)=>'P'+(i+1)+' '+p.ft.toFixed(1)+'ft '+(p.made?'\u2713':'\u2717')).join('  \u00b7  ')+
+  el.innerHTML=h.putts.map((p,i)=>'P'+(i+1)+' '+fmtDist(p.ft)+' '+(p.made?'\u2713':'\u2717')).join('  \u00b7  ')+
     '  \u00b7  <b>'+h.putts.length+' putt'+(h.putts.length>1?'s':'')+'</b>';
 }
 function logPutt(made){
@@ -2614,21 +2630,29 @@ function logPutt(made){
 }
 document.getElementById('btnMissed').addEventListener('click',()=>logPutt(false));
 document.getElementById('btnMade').addEventListener('click',()=>logPutt(true));
-function updateResult(){
-  queueSave();renderPuttList();
+// under 10 feet the inches matter — that's where you're deciding a 6-incher from a 3-footer
+function fmtDist(ft){
+  if(ft<10){let w=Math.floor(ft),i=Math.round((ft-w)*12);
+    if(i===12){w+=1;i=0;}
+    if(!w)return i+' in';
+    return i?(w+' ft '+i+' in'):(w+' ft');}
+  return ft.toFixed(1)+' ft';
+}
+function updateResult(light){
+  if(!light){queueSave();renderPuttList();}
   const g=H().green,big=document.getElementById('resultBig'),sm=document.getElementById('resultSmall');
   if(!g.ball||!g.flag){big.textContent='–';sm.textContent='Press Read Putt, then tap ball and flag';gn.draw();return;}
   const ft=gFeet(g.ball,g.flag,g.cal);
   const ud=g.updown?({up:'uphill',down:'downhill',level:'level'})[g.updown]:'';
-  if(g.brk==='none'){big.textContent=ft.toFixed(1)+' ft · no break';
+  if(g.brk==='none'){big.textContent=fmtDist(ft)+' · no break';
     sm.textContent=(ud?ud+' — ':'')+'aim straight at the hole';gn.draw();return;}
-  if(!g.brk){big.textContent=ft.toFixed(1)+' ft putt';
+  if(!g.brk){big.textContent=fmtDist(ft)+' putt';
     sm.textContent='Pick the break: L→R, R→L, or No Break';gn.draw();return;}
-  if(g.slopePct==null){big.textContent=ft.toFixed(1)+' ft putt';
+  if(g.slopePct==null){big.textContent=fmtDist(ft)+' putt';
     sm.textContent='Type the printed slope number into the Slope% box';gn.draw();return;}
   const inch=breakInches(ft,g.slopePct);
   big.textContent='Aim '+inch.toFixed(1)+'" '+(g.brk==='lr'?'LEFT':'RIGHT')+' of the hole';
-  sm.textContent=ft.toFixed(1)+' ft · '+g.slopePct+'% · breaks '+(g.brk==='lr'?'L→R':'R→L')+(ud?' · '+ud:'');
+  sm.textContent=fmtDist(ft)+' · '+g.slopePct+'% · breaks '+(g.brk==='lr'?'L→R':'R→L')+(ud?' · '+ud:'');
   gn.draw();
 }
 

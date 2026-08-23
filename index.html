@@ -791,10 +791,11 @@ function showRefineBar(msg){
   document.getElementById('rfLabel').textContent=msg;
   bar.style.display='flex';
 }
-function endRefine(){
+function endRefine(keepZoom){
   refine=null;
   document.getElementById('refineBar').style.display='none';
-  if(preZoom){fw.zoom=preZoom.zoom;fw.ox=preZoom.ox;fw.oy=preZoom.oy;fw.clamp();preZoom=null;}
+  if(preZoom&&!keepZoom){fw.zoom=preZoom.zoom;fw.ox=preZoom.ox;fw.oy=preZoom.oy;fw.clamp();}
+  preZoom=null;
   fw.draw();
 }
 function moveWholeShape(poly,dx,dy){ poly.forEach(p=>{p.nx+=dx;p.ny+=dy;}); }
@@ -1307,19 +1308,24 @@ fw.render=function(c,v){
   const K=mk(v);
   if(h.flag){const q=v.toScreen(h.flag.nx,h.flag.ny);drawPin(c,q.x,q.y,pinZone(h.flag),K);}
   if(refine){
+    // black core with a white halo: cyan disappeared against the grass
     const q=v.toScreen(refine.nx,refine.ny);
-    if(refine.kind==='shot'){
-      c.beginPath();c.arc(q.x,q.y,13*DPR*K,0,7);
-      c.fillStyle='#41c7c7';c.fill();
-      c.lineWidth=2.5*DPR*K;c.strokeStyle='#0a1f16';c.stroke();
-    }
-    c.beginPath();c.arc(q.x,q.y,26*DPR*K,0,7);
-    c.strokeStyle='#41c7c7';c.lineWidth=2*DPR*K;c.setLineDash([4*DPR,4*DPR]);c.stroke();c.setLineDash([]);
-    c.fillStyle='#41c7c7';c.font='bold '+(9*DPR*K)+'px monospace';c.textAlign='center';
-    c.fillText('DRAG ME',q.x,q.y+42*DPR*K);
+    c.beginPath();c.arc(q.x,q.y,14*DPR*K,0,7);
+    c.fillStyle='#000000';c.fill();
+    c.lineWidth=3*DPR*K;c.strokeStyle='#ffffff';c.stroke();
+    c.beginPath();c.moveTo(q.x-22*DPR*K,q.y);c.lineTo(q.x+22*DPR*K,q.y);
+    c.moveTo(q.x,q.y-22*DPR*K);c.lineTo(q.x,q.y+22*DPR*K);
+    c.strokeStyle='#000000';c.lineWidth=3.5*DPR*K;c.stroke();
+    c.strokeStyle='#ffffff';c.lineWidth=1.5*DPR*K;c.stroke();
+    c.beginPath();c.arc(q.x,q.y,30*DPR*K,0,7);
+    c.strokeStyle='#ffffff';c.lineWidth=2*DPR*K;c.setLineDash([5*DPR,4*DPR]);c.stroke();c.setLineDash([]);
     const rp=refPoint();
-    if(rp&&h.ypp){c.fillStyle='#eef3ea';c.font='bold '+(12*DPR*K)+'px monospace';
-      c.fillText(yd(fw.px(rp,refine))+'y',q.x,q.y-34*DPR*K);}
+    if(rp&&h.ypp){
+      const txt=yd(fw.px(rp,refine))+'y';
+      c.font='bold '+(13*DPR*K)+'px monospace';c.textAlign='center';
+      c.lineWidth=4*DPR*K;c.strokeStyle='#000000';c.strokeText(txt,q.x,q.y-40*DPR*K);
+      c.fillStyle='#ffffff';c.fillText(txt,q.x,q.y-40*DPR*K);
+    }
   }
   placed=[];
   shots.forEach((p,i)=>{
@@ -1701,13 +1707,18 @@ document.getElementById('btnZoneFinish').addEventListener('click',()=>{
 document.getElementById('btnRefineOK').addEventListener('click',()=>{
   if(!refine)return;
   const kind=refine.kind, nx=refine.nx, ny=refine.ny, tgtId=refine.tgt;
-  endRefine();
+  endRefine(kind==='target');          // a locked target keeps the zoom you set it at
   const h=H();
   if(kind==='target'){
     const live=h.targets.filter(t=>!t.locked);
     live.forEach(t=>{t.nx=nx;t.ny=ny;});
+    const t=lastTarget();
+    if(t){
+      t.locked=true;                   // one tap = placed AND locked
+      syncLock();fw.draw();renderLog();updateReadout(null);
+      if(askAt==='target'&&!t.club){ openTargetShot(t); return; }
+    }
     fw.draw();renderLog();updateReadout({nx:nx,ny:ny});syncLock();
-    toast('Target set \u2014 now lock it to pick a club');
     return;
   }
   const tg=(h.targets||[]).find(t=>t.id===tgtId)||activeTarget();

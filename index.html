@@ -52,8 +52,8 @@
   .zoomctl{position:absolute;right:7px;bottom:7px;display:flex;flex-direction:column;gap:4px;z-index:6;}
   .zoomctl button{width:36px;height:36px;border-radius:9px;background:rgba(10,31,22,0.88);
     border:1px solid var(--line);color:var(--chalk);font-size:16px;font-family:inherit;}
-  #readout{position:absolute;left:7px;top:96px;z-index:7;background:rgba(10,31,22,0.93);
-    border:1px solid var(--accent);border-radius:10px;padding:6px 8px;min-width:118px;max-width:172px;
+  #readout{position:absolute;left:6px;top:88px;z-index:7;background:rgba(10,31,22,0.93);
+    border:1px solid var(--accent);border-radius:9px;padding:4px 5px;min-width:84px;max-width:110px;
     touch-action:none;cursor:grab;}
   #readout .ro-t{font-size:8px;color:var(--chalk-dim);text-transform:uppercase;letter-spacing:1px;}
   #readout .ro-main{font-size:15px;font-weight:bold;color:var(--accent);line-height:1.2;}
@@ -64,11 +64,11 @@
   .ro-chips .chip span.pl{font-size:11px;color:var(--target);margin-left:3px;}
   #readout .ro-sub{font-size:9px;color:var(--chalk-dim);line-height:1.4;margin-top:4px;}
   .ro-chips{display:flex;flex-direction:column;gap:3px;margin-top:3px;}
-  .ro-chips .chip{background:var(--turf-2);border:1px solid var(--line);border-radius:7px;
-    padding:3px 7px;font-family:inherit;color:var(--chalk);display:flex;flex-direction:row;
-    align-items:baseline;justify-content:space-between;gap:8px;line-height:1.2;}
-  .ro-chips .chip b{font-size:8px;letter-spacing:1px;color:var(--chalk-dim);font-weight:normal;}
-  .ro-chips .chip span{font-size:14px;font-weight:bold;color:var(--accent);}
+  .ro-chips .chip{background:var(--turf-2);border:1px solid var(--line);border-radius:6px;
+    padding:2px 5px;font-family:inherit;color:var(--chalk);display:flex;flex-direction:row;
+    align-items:baseline;justify-content:space-between;gap:4px;line-height:1.15;}
+  .ro-chips .chip b{font-size:7px;letter-spacing:0.5px;color:var(--chalk-dim);font-weight:normal;}
+  .ro-chips .chip span{font-size:13px;font-weight:bold;color:var(--accent);}
   .ro-chips .chip.front{border-color:#d94f37;}
   .ro-chips .chip.mid{border-color:#ffffff;}
   .ro-chips .chip.back{border-color:#4a90d9;}
@@ -291,7 +291,7 @@
           <button class="chip mid"   data-goto="mid"><b>MID</b><span id="chMid">–</span></button>
           <button class="chip front" data-goto="front"><b>FRONT</b><span id="chFront">–</span></button>
         </div>
-        <div class="ro-elev">
+        <div class="ro-elev" style="display:none">
           <button data-relev="-5">−</button>
           <span id="roElev">0 ft</span>
           <button data-relev="5">+</button>
@@ -723,7 +723,8 @@ Viewer.prototype.resize=function(){
 };
 Viewer.prototype.fit=function(){
   if(!this.ready)return;const cw=this.cv.width,ch=this.cv.height;
-  this.baseScale=Math.min(cw/this.img.naturalWidth,ch/this.img.naturalHeight)*0.97;
+  // no slack — the hole should reach the edges rather than sit in a margin
+  this.baseScale=Math.min(cw/this.img.naturalWidth,ch/this.img.naturalHeight);
   this.zoom=1;
   this.ox=(cw-this.img.naturalWidth*this.baseScale)/2;
   this.oy=(ch-this.img.naturalHeight*this.baseScale)/2;

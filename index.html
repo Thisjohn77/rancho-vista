@@ -1727,11 +1727,22 @@ function greenThird(h,which){
   const t = which==='front'?0.80 : which==='back'?0.20 : 0.5;   // ny: low = back
   return {nx:sx/n, ny:lo+(hi-lo)*t};
 }
+function teeGroupsForCount(n){
+  // Real courses often share one physical pad between adjacent tee colors
+  // (most commonly red/white forward together). Map however many boxes were
+  // actually traced onto sensible groups, nearest-the-green first.
+  if(n>=4) return [['red'],['white'],['blue'],['gold']];
+  if(n===3) return [['red','white'],['blue'],['gold']];
+  if(n===2) return [['red','white'],['blue','gold']];
+  return [['red','white','blue','gold']];
+}
 function quickSetupApply(teeKey){
   const h=H();
   const ord=teePolysOrdered(h), gc=greenCentre(h);
   if(!ord||!gc){toast('Trace the tee boxes and green on this hole first');return false;}
-  const idx=TEE_ORDER.indexOf(teeKey);
+  const groups=teeGroupsForCount(ord.length);
+  let idx=groups.findIndex(g=>g.indexOf(teeKey)!==-1);
+  if(idx===-1) idx=TEE_ORDER.indexOf(teeKey);
   const pick=ord[idx]||ord[ord.length-1];
   if(!fw.img||!h.setup||!h.rw||!h.rh){toast('Run the two-tap Setup once on this hole first');return false;}
   const P=zoneFrame(h.setup,h.rw,h.rh,fw.img);

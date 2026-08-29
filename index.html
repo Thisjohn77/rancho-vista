@@ -12,12 +12,12 @@
     font-family:'Courier New',ui-monospace,Menlo,monospace;color:var(--chalk);
     touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%;}
   #app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;}
-  header{background:var(--turf-1);border-bottom:1px solid var(--line);padding:3px 6px;
+  header{background:var(--turf-1);border-bottom:1px solid var(--line);padding:2px 5px;
     display:flex;align-items:center;gap:4px;flex:0 0 auto;overflow-x:auto;
     -webkit-overflow-scrolling:touch;scrollbar-width:none;}
   header::-webkit-scrollbar{display:none;}
-  header .mode-btn{min-width:0;padding:4px 7px;font-size:10px;}
-  header .mode-btn .ic{font-size:13px;}
+  header .mode-btn{min-width:0;padding:2px 5px;font-size:9px;}
+  header .mode-btn .ic{font-size:11px;}
   .holepick{display:flex;align-items:center;background:var(--turf-2);border:1px solid var(--line);border-radius:7px;}
   .holepick button{background:none;border:none;color:var(--chalk);font-size:15px;padding:5px 8px;}
   .holepick .lbl{font-size:11px;font-weight:bold;min-width:64px;text-align:center;}
@@ -27,7 +27,7 @@
   .iconbtn{background:var(--turf-2);border:1px solid var(--line);color:var(--chalk);border-radius:6px;
     padding:6px 7px;font-size:11px;font-family:inherit;}
   #maintabs{display:flex;background:var(--turf-1);border-bottom:1px solid var(--line);flex:0 0 auto;}
-  .maintab{flex:1;text-align:center;padding:5px 3px;font-size:10px;font-weight:bold;letter-spacing:1px;
+  .maintab{flex:1;text-align:center;padding:3px 3px;font-size:9px;font-weight:bold;letter-spacing:0.5px;
     color:var(--chalk-dim);text-transform:uppercase;border-bottom:2px solid transparent;}
   .maintab.active{color:var(--accent);border-bottom-color:var(--accent);}
   #fairwayView,#greenView{flex:1 1 auto;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
@@ -86,8 +86,9 @@
   .toggles button.on{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:bold;}
   #log{background:var(--turf-1);border-top:1px solid var(--line);flex:0 0 auto;display:flex;flex-direction:column;min-height:0;}
   #log.collapsed #logBody{display:none;}
+  #log.collapsed #logExtras{display:none;}
   #logBody{overflow-y:auto;max-height:28vh;}
-  #logHead{cursor:pointer;user-select:none;margin:0;padding:6px 9px 4px;font-size:10px;letter-spacing:1px;
+  #logHead{cursor:pointer;user-select:none;margin:0;padding:3px 8px;font-size:9px;letter-spacing:0.5px;
     color:var(--chalk-dim);text-transform:uppercase;display:flex;justify-content:space-between;gap:8px;}
   #logToggle{color:var(--accent);}
   .shot-row{display:flex;align-items:center;gap:7px;padding:6px 9px;border-top:1px solid rgba(255,255,255,0.06);}
@@ -314,7 +315,7 @@
     <div id="log">
       <h3 id="logHead"><span><span id="logToggle">&#9662;</span> Shot Log <span style="color:var(--chalk-dim);font-weight:normal">(tap a row to edit)</span></span><span id="scaleStatus"></span></h3>
       <div id="logBody"></div>
-      <div class="row" style="flex-wrap:wrap;gap:5px;padding:6px 8px 10px;border-top:1px solid rgba(255,255,255,.08)">
+      <div class="row" id="logExtras" style="flex-wrap:wrap;gap:4px;padding:5px 8px 7px;border-top:1px solid rgba(255,255,255,.08)">
         <span class="mini" style="flex:1 0 100%">What shows on the hole</span>
         <button class="pbtn" id="btnAskAt" style="flex:0 0 auto;font-size:11px">Ask @ Target</button>
         <button class="pbtn" data-layer="targets" style="flex:0 0 auto;font-size:11px">Targets</button>
@@ -2533,6 +2534,7 @@ function renderLog(){
   // keep the log out of the way once it gets long
   const lg=document.getElementById('log');
   if(!lg.dataset.userToggled){lg.classList.add('collapsed');
+    document.getElementById('logToggle').textContent='\u25b8';
     document.getElementById('logToggle').textContent='▸';}
 }
 /* ---------------- club selection ----------------

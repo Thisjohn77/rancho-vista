@@ -1445,10 +1445,15 @@ fw.render=function(c,v){
   // the flight of each shot, bending the way you said it did
   const SK=mk(v);
   if(layers.shapes!==false){
-    for(let i=0;i<shots.length-1;i++){
-      const to=shots[i+1]; const sh=to.shape&&SHOT_SHAPES[to.shape];
-      if(!sh)continue;
-      const A=v.toScreen(shots[i].nx,shots[i].ny), B=v.toScreen(to.nx,to.ny);
+    // a shot flies from the ball you were standing at — not from one you
+    // abandoned or replayed, even though that marker still sits on the map
+    let fromPt=null;
+    for(let i=0;i<shots.length;i++){
+      const to=shots[i], sh=to.shape&&SHOT_SHAPES[to.shape];
+      const prev=fromPt;
+      if(!to.noPlay&&!to.replayed)fromPt=to; else if(!fromPt)fromPt=to;
+      if(i===0||!sh||!prev)continue;
+      const A=v.toScreen(prev.nx,prev.ny), B=v.toScreen(to.nx,to.ny);
       const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1;
       const px=-dy/L, py=dx/L;                     // perpendicular to the flight
       const bend=sh.bend*L, st=sh.start*L;

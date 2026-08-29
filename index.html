@@ -1025,7 +1025,7 @@ function afterLie(h,lie){
   if(lie==='penalty'){
     setTimeout(()=>{
       const shots=h.points.filter(p=>p.type==='shot').sort((a,b)=>a.seq-b.seq);
-      const ball=shots[shots.length-1];
+      const ball=liveBall(shots)||shots[shots.length-1];
       const pen0=h.pen||0, marks=shots.length;
       const hit1=marks+pen0+1;
       const isRed=confirm(
@@ -1472,7 +1472,7 @@ fw.render=function(c,v){
       }
     }
   }
-  const ball=shots.length?shots[shots.length-1]:{nx:0.5,ny:TEE_NY};
+  const ball=liveBall(shots)||{nx:0.5,ny:TEE_NY};
   const grn=pins.mid||{nx:0.5,ny:GRN_NY};
 
   if(layers.arcs&&h.ypp){
@@ -1499,6 +1499,7 @@ fw.render=function(c,v){
     });
     // every played shot keeps the line to the target it was aimed at
     shots.forEach(p=>{
+      if(p.noPlay||p.replayed)return;   // a ball you walked away from keeps no aim line
       const tg=targetOf(p); if(!tg)return;
       const a=v.toScreen(p.nx,p.ny),q=v.toScreen(tg.nx,tg.ny);
       c.strokeStyle='rgba(65,199,199,0.9)';c.lineWidth=2*DPR;c.setLineDash([3*DPR,4*DPR]);
@@ -1508,7 +1509,8 @@ fw.render=function(c,v){
     // curved the way you said you intend to shape it
     const live=activeTarget();
     if(live&&shots.length){
-      const last=shots[shots.length-1],a=v.toScreen(last.nx,last.ny),q=v.toScreen(live.nx,live.ny);
+      const last=liveBall(shots)||{nx:0.5,ny:TEE_NY};
+      const a=v.toScreen(last.nx,last.ny),q=v.toScreen(live.nx,live.ny);
       const wsh=live.shape&&SHOT_SHAPES[live.shape];
       c.setLineDash([5*DPR,5*DPR]);
       if(wsh&&wsh.bend){
@@ -1835,6 +1837,15 @@ function setMode(m){
   updateReadout(null);syncLock();
 }
 function hint(s){document.getElementById('hint').textContent=s;}
+/* The ball you are actually standing at. Skips markers you are not playing from:
+   ones abandoned for a drop, and ones replayed under stroke & distance. */
+function liveBall(shots){
+  for(let i=shots.length-1;i>=0;i--){
+    const p=shots[i];
+    if(!p.noPlay&&!p.replayed)return p;
+  }
+  return null;
+}
 function refPoint(){ // where you're playing from = last shot, else the tee
   // Skip balls you aren't playing from: ones abandoned for a drop (noPlay), and
   // ones replayed under stroke & distance — there you go BACK to the previous spot.
@@ -2165,7 +2176,7 @@ function openTargetShot(tg){
 function openResult(n,tg){
   pendingTarget=null;editingId=null;pending=n;resultMode=true;
   const h=H(),shots=h.points.filter(p=>p.type==='shot').sort((a,b)=>a.seq-b.seq);
-  const last=shots[shots.length-1];
+  const last=liveBall(shots);
   document.getElementById('shotModalTitle').textContent='Shot '+nextSeq()+' — where it finished';
   setLabels('From last','Front','Mid','Back');
   const g=k=>h.points.find(q=>q.type==='pin'&&q.sub===k);
@@ -2208,7 +2219,7 @@ function openShot(n){
   pendShape=null;renderShapeGrid();shapeFieldVisible(layers.shapes!==false);
   document.getElementById('shotModalTitle').textContent='Shot '+nextSeq();
   const h=H(),shots=h.points.filter(p=>p.type==='shot').sort((a,b)=>a.seq-b.seq);
-  const last=shots[shots.length-1];
+  const last=liveBall(shots);
   const g=k=>h.points.find(p=>p.type==='pin'&&p.sub===k);
   const setB=(id,lbl,base,pt)=>{
     const el=document.getElementById(id),lb=document.getElementById(lbl);
@@ -2323,7 +2334,7 @@ document.getElementById('btnUnplay').addEventListener('click',()=>{
   const h=H();
   const shots=h.points.filter(p=>p.type==='shot').sort((a,b)=>a.seq-b.seq);
   if(!shots.length){toast('Log a shot first');return;}
-  const ball=shots[shots.length-1];
+  const ball=liveBall(shots)||shots[shots.length-1];
   const prev=shots[shots.length-2]||null;
   const lie=ball.lie||detectLie(ball.nx,ball.ny);
 
@@ -2381,7 +2392,7 @@ document.getElementById('btnHoled').addEventListener('click',()=>{
   if(!h.render){toast('Run Setup for this hole first');return;}
   const shots=h.points.filter(p=>p.type==='shot').sort((a,b)=>a.seq-b.seq);
   if(!shots.length){toast('No shots yet on this hole');return;}
-  const cur=shots[shots.length-1];           // the ball you're standing at
+  const cur=liveBall(shots)||shots[shots.length-1];   // the ball you're standing at
   if(cur.holed){toast('Already holed out — Undo first if that is wrong');return;}
   /* A marker is the spot you play a shot FROM, so holing out from marker N
      means the hole took N strokes. Nothing new is added. */

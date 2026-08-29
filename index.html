@@ -1836,8 +1836,9 @@ function setMode(m){
 }
 function hint(s){document.getElementById('hint').textContent=s;}
 function refPoint(){ // where you're playing from = last shot, else the tee
-  // a ball abandoned under a relief rule is not where you play from
-  const h=H(),sh=h.points.filter(p=>p.type==='shot'&&!p.noPlay).sort((a,b)=>a.seq-b.seq);
+  // Skip balls you aren't playing from: ones abandoned for a drop (noPlay), and
+  // ones replayed under stroke & distance — there you go BACK to the previous spot.
+  const h=H(),sh=h.points.filter(p=>p.type==='shot'&&!p.noPlay&&!p.replayed).sort((a,b)=>a.seq-b.seq);
   return sh.length?sh[sh.length-1]:{nx:0.5,ny:TEE_NY};
 }
 function pinsOf(){const h=H(),o={};['front','mid','back'].forEach(k=>o[k]=h.points.find(p=>p.type==='pin'&&p.sub===k));return o;}

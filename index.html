@@ -1491,10 +1491,15 @@ fw.render=function(c,v){
     c.restore();
   }
   // shot path
-  if(shots.length>1){
-    c.strokeStyle='rgba(238,243,234,0.6)';c.lineWidth=2*DPR;c.setLineDash([6*DPR,6*DPR]);
-    c.beginPath();shots.forEach((p,i)=>{const q=v.toScreen(p.nx,p.ny);i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y);});
-    c.stroke();c.setLineDash([]);
+  {
+    // the route you actually walked: skip balls you abandoned or replayed, so the
+    // path doesn't detour out of bounds and back again
+    const walked=shots.filter(p=>!p.noPlay&&!p.replayed);
+    if(walked.length>1){
+      c.strokeStyle='rgba(238,243,234,0.6)';c.lineWidth=2*DPR;c.setLineDash([6*DPR,6*DPR]);
+      c.beginPath();walked.forEach((p,i)=>{const q=v.toScreen(p.nx,p.ny);i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y);});
+      c.stroke();c.setLineDash([]);
+    }
   }
   // target + miss line
   if(layers.targets){
@@ -3241,7 +3246,8 @@ function buildCard(){
       '<td>'+(isPar3?'<span style="color:var(--chalk-dim)">\u2013</span>'
         :'<button class="tog'+(effFir===true?' yes':effFir===false?' no':'')+'" data-fir="'+n+'">'+
           (effFir===true?'\u2713':effFir===false?'\u2717':'\u00b7')+'</button>')+'</td>'+
-      '<td><button class="tog'+(h.gir===true?' yes':h.gir===false?' no':'')+'" data-gir="'+n+'">'+
+      // colour from what actually happened, not just from a manual override
+      '<td><button class="tog'+(st?(st.gir?' yes':' no'):'')+'" data-gir="'+n+'">'+
         (st?(st.gir?'\u2713':'\u2717'):'\u2013')+'</button></td></tr>';
   }
   const tot=out+inn,parTot=parOut+parIn;

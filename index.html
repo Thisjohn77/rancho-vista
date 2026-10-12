@@ -626,7 +626,13 @@ const HOLE1_IMAGES = {
 const CLUBS=["Driver","3W","5W","Hyb","3i","4i","5i","6i","7i","8i","9i","PW","GW","SW","LW","Putt"];
 let clubNames={};     // club id -> the name/loft you typed, e.g. "LW 60\u00b0"
 let extraClubs=[];    // clubs you added yourself (ids X1, X2 ...)
-function allClubs(){return CLUBS.filter(c=>c!=='Putt').concat(extraClubs,['Putt']);}
+function allClubs(){
+  // longest to shortest by the yardage you typed; clubs with no yardage yet sit after them
+  const base=CLUBS.filter(c=>c!=='Putt').concat(extraClubs);
+  const have=base.filter(c=>bag[c]>0).sort((a,b)=>bag[b]-bag[a]);
+  const none=base.filter(c=>!(bag[c]>0));
+  return have.concat(none,['Putt']);
+}
 function clubLabel(id){return (clubNames[id]&&String(clubNames[id]).trim())||id;}
 const BREAK_FEET=[3,4,5,6,7,8,9,10,11,12,13,14,15];
 const BREAK_PCT=[0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0];
@@ -3475,6 +3481,7 @@ document.getElementById('windInput').addEventListener('input',e=>{
   if(wind.mph>0&&wind.dir==='none'){wind.dir='into';
     document.querySelectorAll('[data-wind]').forEach(x=>x.classList.toggle('active',x.dataset.wind==='into'));}
   updateReadout(null);condLive();queueSave();});
+let bagClicking=false;
 function buildBag(){
   const w=document.getElementById('bagList');
   const ids=allClubs().filter(c=>c!=='Putt');
@@ -3493,6 +3500,10 @@ function buildBag(){
     const v=parseFloat(inp.value);
     if(v>0)bag[inp.dataset.club]=Math.round(v); else delete bag[inp.dataset.club];
     updateReadout(null);bagLive();queueSave();buildClubGrid();
+  }));
+  // when you finish typing a yardage, slide that club into its place in the list
+  w.querySelectorAll('input[data-club]').forEach(inp=>inp.addEventListener('change',()=>{
+    if(!bagClicking)buildBag();
   }));
   w.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
     const id=b.dataset.del;

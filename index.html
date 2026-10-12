@@ -727,7 +727,10 @@ Viewer.prototype.setImage=function(src,cb,keep){
   const s=this;const kz=this.zoom,kx=this.ox,ky=this.oy,kb=this.baseScale;
   if(!src){this.img=null;this.ready=false;this.draw();if(cb)cb();return;}
   const im=new Image();
-  im.onload=function(){s.img=im;s.ready=true;s._fitted=true;s.resize();
+  const myLoad=(s._loadSeq=(s._loadSeq||0)+1);
+  im.onload=function(){
+    if(myLoad!==s._loadSeq)return;   // a newer picture was requested; don't let this stale one win
+    s.img=im;s.ready=true;s._fitted=true;s.resize();
     if(keep&&kb){s.zoom=kz;s.baseScale=kb;s.ox=kx;s.oy=ky;s.clamp();}else s.fit();
     s.draw();if(cb)cb();};
   im.src=src;
@@ -3214,12 +3217,13 @@ function goHole(n){
   mode='shot';setupStage=0;
   document.querySelectorAll('.mode-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode==='shot'));
   if(!H().render){ setMode('setup'); }
-  else { loadHoleImage(false); hint('Tap where your ball is. Drag any marker to move it.');
-         setTimeout(()=>{ensurePins();fw.draw();renderLog();updateReadout(null);},120);
+  else {
          // a traced hole with no shots yet: go straight to the tee / pin picker
          const fresh=!H().points.some(p=>p.type==='shot');
          const ordT=teePolysOrdered(H());
-         if(fresh&&ordT&&ordT.length&&H().setup)setMode('setup'); }
+         if(fresh&&ordT&&ordT.length&&H().setup){ setMode('setup'); }   // setMode loads the right picture itself
+         else { loadHoleImage(false); hint('Tap where your ball is. Drag any marker to move it.');
+                setTimeout(()=>{ensurePins();fw.draw();renderLog();updateReadout(null);},120); } }
   syncLock();updateReadout(null);
 }
 // the ‹ › arrows moved into the hole sheet; guard in case they are absent

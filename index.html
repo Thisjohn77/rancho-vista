@@ -624,6 +624,10 @@ const HOLE1_IMAGES = {
 "use strict";
 
 const CLUBS=["Driver","3W","5W","Hyb","3i","4i","5i","6i","7i","8i","9i","PW","GW","SW","LW","Putt"];
+let clubNames={};     // club id -> the name/loft you typed, e.g. "LW 60\u00b0"
+let extraClubs=[];    // clubs you added yourself (ids X1, X2 ...)
+function allClubs(){return CLUBS.filter(c=>c!=='Putt').concat(extraClubs,['Putt']);}
+function clubLabel(id){return (clubNames[id]&&String(clubNames[id]).trim())||id;}
 const BREAK_FEET=[3,4,5,6,7,8,9,10,11,12,13,14,15];
 const BREAK_PCT=[0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0];
 const BREAK_DATA=[
@@ -1926,7 +1930,7 @@ function updateReadout(pt){
   }
   if(pt) bits.push(fmt(fw.px(pt,refPoint()))+'y out');
   const pl=clubPlan(from);
-  if(pl&&pl.best) bits.push(pl.best.club+' ('+pl.best.dist+'y)');
+  if(pl&&pl.best) bits.push(clubLabel(pl.best.club)+' ('+pl.best.dist+'y)');
   else if(pl) bits.push('add 🎒 CLUBS');
 
   S.textContent=bits.join('  \u00b7  ');
@@ -2120,13 +2124,13 @@ document.querySelectorAll('[data-zoom]').forEach(b=>b.addEventListener('click',(
 /* ---- shot modal ---- */
 const cg=document.getElementById('clubGrid');
 function buildClubGrid(){
-  const carried=CLUBS.filter(c=>c==='Putt'||bag[c]>0);
-  const list=(carried.length>1)?carried:CLUBS;      // nothing entered yet? show them all
+  const carried=allClubs().filter(c=>c==='Putt'||bag[c]>0);
+  const list=(carried.length>1)?carried:allClubs();      // nothing entered yet? show them all
   cg.innerHTML='';
   list.forEach(cl=>{
     const b=document.createElement('button');b.className='club-chip';b.type='button';
     b.dataset.club=cl;
-    b.innerHTML=cl+(bag[cl]>0?'<br><span style="font-size:9px;color:var(--chalk-dim)">'+bag[cl]+'y</span>':'');
+    b.innerHTML=esc(clubLabel(cl))+(bag[cl]>0?'<br><span style="font-size:9px;color:var(--chalk-dim)">'+bag[cl]+'y</span>':'');
     b.addEventListener('click',()=>{club=cl;
       cg.querySelectorAll('.club-chip').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');});
     cg.appendChild(b);
@@ -2351,12 +2355,16 @@ document.getElementById('shotSave').addEventListener('click',()=>{
     pending=null;resultMode=false;showAllFields();movableId=null;peekId=null;
     hide('shotModal');
     setMode('target');hint('Drop your next target, then lock it to pick a club.');
+    fw.fit();   // zoom back out to the whole hole for the next shot
     fw.draw();renderLog();updateReadout(null);
     if(onGreen&&hasGreen()){
       setTimeout(()=>{
         document.querySelector('.maintab[data-tab="green"]').click();
         toast('On the green \u2014 open a panel and press Read Putt');
       },260);
+    } else if(onGreen){
+      // no StrackaLine pages for this hole yet, so there is no green view to open
+      setTimeout(()=>toast('On the green \u2014 no green-reading pages for this hole yet, so putt reading is off. Tap Holed when it drops.'),260);
     }
     return;
   }
@@ -2520,7 +2528,7 @@ function renderLog(){
     if(p.shape&&p.wanted){shapeTxt+=(p.wanted===p.shape)?' \u2713':' (wanted '+SHOT_SHAPES[p.wanted].name.toLowerCase()+')';}
     // a ball sitting on the green was putted from there, even though the green view logs the putts
     const onGrn=(p.lie==='green')&&h.putts&&h.putts.length;
-    const clubTxt=p.noPlay?'\u2014':(p.club||(onGrn?'Putt':'No club'));
+    const clubTxt=p.noPlay?'\u2014':(p.club?clubLabel(p.club):(onGrn?'Putt':'No club'));
     const wentTxt=p.noPlay?'ball finished here \u2014 abandoned, you dropped instead'
                  :p.replayed?'ball left here \u2014 replayed from your previous spot'
                  :p.dropped?'your drop':went;
@@ -2610,7 +2618,7 @@ function targetHTML(from,tg){
   let h='<b>'+p.raw+'y</b> to your target &middot; plays <b>'+p.plays+'y</b>';
   if(p.plays===p.raw) h+=' <span style="font-size:10px;color:var(--chalk-dim)">(flat &amp; calm)</span>';
   if(!p.best) return {warn:true,html:h+'<br><span style="font-size:11px">Tap <b>🎒 CLUBS</b> to enter your yardages</span>'};
-  h+=' &rarr; <b>'+p.best.club+'</b> ('+p.best.dist+'y)';
+  h+=' &rarr; <b>'+esc(clubLabel(p.best.club))+'</b> ('+p.best.dist+'y)';
   h+='<br><span style="color:var(--chalk-dim);font-size:10px">'+
      (p.putt?'on the green — putt or chip it':p.onGreen?'aiming at the green':'laying up to your target')+' &middot; '+
      (cs?cs:'flat &amp; calm')+(p.best.flags&&p.best.flags.length?' &middot; '+p.best.flags.join(', '):'')+'</span>';
@@ -2626,14 +2634,14 @@ function advHTML(from){
   const csTop=condSummary();
   let h='<b>'+g.rawPin+'y</b> to the pin &middot; plays <b>'+g.pin+'y</b>';
   h+= g.adj ? ' ('+(g.adj>0?'+':'')+g.adj+')' : ' <span style="font-size:10px;color:var(--chalk-dim)">(flat &amp; calm)</span>';
-  h+=' &rarr; <b>'+b.club+'</b> ('+b.dist+'y)';
+  h+=' &rarr; <b>'+esc(clubLabel(b.club))+'</b> ('+b.dist+'y)';
   const cs=condSummary();
   h+='<br><span style="color:var(--chalk-dim);font-size:10px">'+pl.why+
      ' &middot; green plays '+g.front+'\u2013'+g.back+'y &middot; '+
      (cs?cs:'flat &amp; calm — set ⛅ COND')+
      (b.flags.length?' &middot; '+b.flags.join(', '):'')+'</span>';
   if(pl.alt){
-    h+='<br><span style="font-size:11px">one more: <b>'+pl.alt.club+'</b> ('+pl.alt.dist+'y)'+
+    h+='<br><span style="font-size:11px">one more: <b>'+esc(clubLabel(pl.alt.club))+'</b> ('+pl.alt.dist+'y)'+
        (pl.alt.flags.length?' <span style="color:var(--danger)">'+pl.alt.flags.join(', ')+'</span>':'')+'</span>';
   }
   return {warn:false, html:h, club:b.club};
@@ -2688,7 +2696,7 @@ function clubPlan(from){
       : (best.dist<=g.back-missYds ? 'just past the pin, still safe' : 'past the pin — careful');
   return {g:g,best:best,alt:alt,why:why};
 }
-const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 document.getElementById('logHead').addEventListener('click',()=>{
   const l=document.getElementById('log');l.dataset.userToggled='1';l.classList.toggle('collapsed');
   document.getElementById('logToggle').textContent=l.classList.contains('collapsed')?'▸':'▾';
@@ -2892,6 +2900,8 @@ document.getElementById('btnClearPutt').addEventListener('click',()=>{
   document.getElementById('puttHint').textContent='Press Read Putt, then tap ball and flag.';
   gn.draw();updateResult();renderPuttList();renderLog();queueSave();});
 function advance(){
+  // after a missed putt the flag is still where it was, so don't ask for it again
+  if(puttMode==='ball'&&H().green.flag)puttMode='flag';
   if(puttMode==='ball'){puttMode='flag';document.getElementById('puttHint').textContent='Now tap the flag / hole.';updateResult();return;}
   if(puttMode==='flag'){puttMode=null;
     document.getElementById('puttHint').textContent='Pick which way it breaks, type the slope %, then set uphill / level / downhill.';
@@ -3199,7 +3209,11 @@ function goHole(n){
   document.querySelectorAll('.mode-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode==='shot'));
   if(!H().render){ setMode('setup'); }
   else { loadHoleImage(false); hint('Tap where your ball is. Drag any marker to move it.');
-         setTimeout(()=>{ensurePins();fw.draw();renderLog();updateReadout(null);},120); }
+         setTimeout(()=>{ensurePins();fw.draw();renderLog();updateReadout(null);},120);
+         // a traced hole with no shots yet: go straight to the tee / pin picker
+         const fresh=!H().points.some(p=>p.type==='shot');
+         const ordT=teePolysOrdered(H());
+         if(fresh&&ordT&&ordT.length&&H().setup)setMode('setup'); }
   syncLock();updateReadout(null);
 }
 // the ‹ › arrows moved into the hole sheet; guard in case they are absent
@@ -3331,12 +3345,14 @@ function snapshot(){
   Object.values(holes).forEach(h=>{out[h.n]={setup:h.setup,points:h.points,targets:h.targets,
     green:h.green,galign:h.galign,pinsInit:h.pinsInit,flag:h.flag,elev:h.elev,pen:h.pen,fir:h.fir,gir:h.gir,putts:h.putts,
     zones:h.zones,grid:h.grid};});
-  return JSON.stringify({v:8,courseVer:COURSE_VERSION,tee:tee,teeChosen:teeChosen,bag:bag,miss:missYds,bias:shortBias,wind:wind,holes:out});
+  return JSON.stringify({v:8,courseVer:COURSE_VERSION,tee:tee,teeChosen:teeChosen,bag:bag,clubNames:clubNames,extraClubs:extraClubs,miss:missYds,bias:shortBias,wind:wind,holes:out});
 }
 function applyState(d,cb){
   if(d.tee){tee=d.tee;document.getElementById('teeSel').value=tee;}
   if(d.teeChosen)teeChosen=true;
   if(d.bag)bag=d.bag;
+  if(d.clubNames)clubNames=d.clubNames;
+  if(Array.isArray(d.extraClubs))extraClubs=d.extraClubs;
   if(d.miss>0)missYds=d.miss;
   if(d.wind)wind=d.wind;
   if(d.bias!=null)shortBias=d.bias;
@@ -3461,15 +3477,35 @@ document.getElementById('windInput').addEventListener('input',e=>{
   updateReadout(null);condLive();queueSave();});
 function buildBag(){
   const w=document.getElementById('bagList');
-  w.innerHTML=CLUBS.filter(c=>c!=='Putt').map(c=>
-    '<div class="bag-row"><label>'+c+'</label>'+
-    '<input type="number" inputmode="numeric" data-club="'+c+'" value="'+(bag[c]||'')+'" placeholder="–">'+
-    '<span>y</span></div>').join('');
-  w.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{
+  const ids=allClubs().filter(c=>c!=='Putt');
+  w.innerHTML=ids.map(c=>
+    '<div class="bag-row"><input type="text" class="bag-name" data-name="'+c+'" value="'+esc(clubLabel(c))+'" placeholder="'+c+'" style="flex:1;width:auto;text-align:left;">'+
+    '<input type="number" inputmode="numeric" data-club="'+c+'" value="'+(bag[c]||'')+'" placeholder="\u2013">'+
+    '<span>y</span>'+(extraClubs.indexOf(c)>=0?'<button type="button" class="bag-del" data-del="'+c+'" style="background:none;border:0;color:var(--chalk-dim);font-size:16px;">&#10005;</button>':'')+'</div>').join('')+
+    '<div style="padding:8px 0;"><button type="button" class="btn" id="bagAdd">+ Add a club</button></div>'+
+    '<p class="note" style="margin-top:2px;">Tap a club name to rename it \u2014 add the loft if you like, like "SW 56\u00b0" or "Gap 48\u00b0".</p>';
+  w.querySelectorAll('input[data-name]').forEach(inp=>inp.addEventListener('input',()=>{
+    const v=inp.value.trim();
+    if(v&&v!==inp.dataset.name)clubNames[inp.dataset.name]=v; else delete clubNames[inp.dataset.name];
+    buildClubGrid();bagLive();queueSave();
+  }));
+  w.querySelectorAll('input[data-club]').forEach(inp=>inp.addEventListener('input',()=>{
     const v=parseFloat(inp.value);
     if(v>0)bag[inp.dataset.club]=Math.round(v); else delete bag[inp.dataset.club];
     updateReadout(null);bagLive();queueSave();buildClubGrid();
   }));
+  w.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.del;
+    extraClubs=extraClubs.filter(x=>x!==id);delete bag[id];delete clubNames[id];
+    buildBag();buildClubGrid();updateReadout(null);queueSave();
+  }));
+  const addB=document.getElementById('bagAdd');
+  if(addB)addB.addEventListener('click',()=>{
+    let n=1;while(extraClubs.indexOf('X'+n)>=0)n++;
+    const id='X'+n;extraClubs.push(id);clubNames[id]='New club';
+    buildBag();buildClubGrid();queueSave();
+    const el=document.querySelector('[data-name="'+id+'"]');if(el){el.focus();el.select();}
+  });
   const bi=document.getElementById('biasInput');
   if(bi){bi.value=shortBias;
     bi.oninput=()=>{shortBias=Math.round(parseFloat(bi.value)||0);updateReadout(null);bagLive();queueSave();};}
